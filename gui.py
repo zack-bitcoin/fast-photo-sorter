@@ -1,7 +1,7 @@
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 import string,cgi,time, json, random, copy, pickle, image64, os
 PORT=8090
-
+output_file='save.txt'
 def fs2dic(fs):
     dic={}
     for i in fs.keys():
@@ -22,7 +22,7 @@ def easyForm(link, button_says, moreHtml='', typee='post'):
         return a.format('get', '{}')
     else:
         return a.format('post', '{}')
-
+linkHome = easyForm('/', 'HOME', '', 'get')
 def page1():
     fs=fs_load()
     tags=[]
@@ -30,12 +30,18 @@ def page1():
         if fs[key] not in tags:
             tags.append(fs[key])
     out="<p>photo organizer</p><br />{}"
-    out=out.format(easyForm('/tagPhotos', 'tag untagged photos'))
-    for tag in tags:
+    out=out.format(easyForm('/tagPhotos', 'tag untagged photos from this location on your hard-drive', '<input type="text" name="location">'))
+    out=out.format("<p>example: /home/Mike/Pictures </p>{}")
+    out=out.format(easyForm('/writeQuit', 'Write & Quit'))
+    out=out.format(easyForm('/delete', 'Delete saved tags'))
+    '''    for tag in tags:
         out=out.format(easyForm('/viewPhotos', 'look at photos tagged as: '+tag, '<input type="hidden" name="tag" value="{}"><input type="hidden" name="picture_numbered" value="0">'.format(tag)))
+'''
+    for tag in tags:
+        out=out.format(easyForm('/renameGroup', 'retag every {} photo to: '.format(tag), '<input type="text" name="newName"><input type="hidden" name="oldName" value="{}">'.format(tag)))
     return out.format('')
 def hex2htmlPicture(string):
-    return '<img src="data:image/png;base64,{}">{}'.format(string, '{}')
+    return '<img height="300" src="data:image/png;base64,{}">{}'.format(string, '{}')
 def file2hexPicture(fil):
     return image64.convert(fil)
 def file2htmlPicture(fil):
@@ -43,6 +49,7 @@ def file2htmlPicture(fil):
 def newline():
     return '''<br />
 {}'''
+empty_page='<html><body>{}</body></html>'
 initial_db={}#{photo_location.jpg:'tag1',...}
 database='tags.db'
 def fs_load():
@@ -53,31 +60,79 @@ def fs_load():
       return pickle.load(open(database, 'rb'))      
 def fs_save(dic):
     pickle.dump(dic, open(database, 'wb'))
-def grab_photos():#from local file
-    files = [f for f in os.listdir('.') if os.path.isfile(f)]
+def grab_photos(location):
+    files = [f for f in os.listdir(location)]# if os.path.isfile(f)]
     photos=[]
     for f in files:
-        if f[-1:] not in['~', '#'] and f[-3:] not in ['.py', '.db'] and f[-4:]!='.pyc':
-            photos.append(f)
+        if f[-4:] in ['.jpg', '.JPG']:
+            photos.append(location+'/'+f)
     return photos
 def tagPhotos(dic_in):
-    photos=grab_photos()
+    print('dic_in: ' +str(dic_in))
+    photos=grab_photos(dic_in['location'])
     fs=fs_load()
     untagged=[]
+    undoable=''
     for photo in photos:
+        print('photo: ' +str(photo))
         if photo not in fs:
             untagged.append(photo)
     if 'tag' in dic_in:
+        undoable=untagged[0]
         fs[untagged[0]]=dic_in['tag']
         untagged.remove(untagged[0])
         fs_save(fs)
-    out='<html><body>{}</body></html>'
+    if 'undoable' in dic_in:
+        undoable=dic_in['undoable']
+        fs.pop(undoable)
+        fs_save(fs)
+        untagged=[undoable]+untagged
+    out=empty_page
     for photo in untagged:
+        print('photo: ' +str(photo))
+        out=out.format('<p>{}/{}</p>{}'.format(len(photos)-len(untagged),len(photos),'{}'))
         out=out.format(file2htmlPicture(photo))
-        out=out.format(easyForm('/tagPhotos', 'next_photo', '<input type="text" name="tag" value="" autofocus>'))
-        return out.format("")
+        out=out.format(easyForm('/tagPhotos', 'next_photo', '<input type="text" name="tag" value="" autofocus><input type="hidden" name="location" value="{}">'.format(dic_in['location'])))
+        out=out.format(easyForm('/tagPhotos', 'UNDO', '<input type="hidden" name="undoable" value="{}"><input type="hidden" name="location" value="{}">'.format(undoable, dic_in['location'])))
+        out=out.format(linkHome)
+        return out.format('')
     out=out.format('<p>all photos have been tagged</p>{}')
-    out=out.format(easyForm('/', 'HOME', '', 'get'))
+    out=out.format(easyForm('/tagPhotos', 'UNDO', '<input type="hidden" name="undoable" value="{}"><input type="hidden" name="location" value="{}">'.format(undoable, dic_in['location'])))
+    out=out.format(linkHome)
+    return out.format('')
+def renameGroup(dic):
+    newName=dic['newName']
+    oldName=dic['oldName']
+    fs=fs_load()
+    for i in fs:
+        if fs[i]==oldName:
+            fs[i]=newName
+    fs_save(fs)
+    out=empty_page
+    out=out.format('<p>successfully renamed group</p>{}')
+    print('linkhome: ' +str(type(linkHome)))
+    out=out.format(linkHome)
+    print('out: ' +str(out))
+    return out.format('')
+def writeQuit(dic):
+    fs=fs_load()
+    out={}
+    for i in fs:
+        if fs[i] not in out:
+            out[fs[i]]=[]
+        out[fs[i]].append(i)
+    f=open(output_file, 'w')
+    for i in out:
+        for j in out[i]:
+            f.write('{}\t{}\n'.format(i, j))
+    f.close()
+    out=empty_page.format('<p>successfully saved to file {}</p>{}'.format(output_file, '{}'))
+    out=out.format(linkHome)
+    return out.format('')
+def delete(dic):
+    fs_save(initial_db)
+    out=empty_page.format('<p>successfully deleted saved tags</p>{}')
+    out=out.format(linkHome)
     return out.format('')
 def viewPhotos(dic_in):
     out='<html><body>{}</body></html>'
@@ -105,14 +160,14 @@ def viewPhotos(dic_in):
         photos.remove(photos[n])
     if n >= len(photos):
         out=out.format("<p>no photos with this tag</p>{}")
-        out=out.format(easyForm('/', 'HOME', '', 'get'))
+        out=out.format(linkHome)
         return out.format('')
     out=out.format(file2htmlPicture(photos[n]))        
     out=out.format(easyForm('/viewPhotos', 'next_photo', '<input type="hidden" name="tag" value="{}"><input type="hidden" name="picture_numbered" value="{}">'.format(dic_in['tag'], str(int(dic_in['picture_numbered'])+1))))
     out=out.format(easyForm('/viewPhotos', 'untag_photo', '<input type="hidden" name="tag" value="{}"><input type="hidden" name="picture_numbered" value="{}"><input type="hidden" name="untag" value="{}">'.format(dic_in['tag'], dic_in['picture_numbered'], dic_in['picture_numbered'])))
     print('dic: ' +str(dic_in))
     out=out.format(easyForm('/viewPhotos', 'retag_photo', '<input type="text" name="retag" value="{}" autofocus><input type="hidden" name="tag" value={}><input type="hidden" name="picture_numbered" value="{}">'.format('', dic_in['tag'], dic_in['picture_numbered'])))
-    out=out.format(easyForm('/', 'HOME', ''))
+    out=out.format(linkHome)
     return out.format('')
 class MyHandler(BaseHTTPRequestHandler):
    def do_GET(self):
@@ -163,6 +218,12 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.wfile.write(tagPhotos(dic))
             elif self.path=='/viewPhotos':
                 self.wfile.write(viewPhotos(dic))
+            elif self.path=='/renameGroup':
+                self.wfile.write(renameGroup(dic))
+            elif self.path=='/writeQuit':
+                self.wfile.write(writeQuit(dic))
+            elif self.path=='/delete':
+                self.wfile.write(delete(dic))
             else:
                 print('ERROR: path {} is not programmed'.format(str(self.path)))
 def main():
