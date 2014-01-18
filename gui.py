@@ -46,7 +46,8 @@ def page1():
     for key in fs:
         if fs[key]['tag'] not in tags:
             tags.append(fs[key]['tag'])
-    tags.remove('')
+    if '' in tags:
+        tags.remove('')
     out="<p>photo organizer</p><br />{}"
     out=out.format(easyForm('/tagPhotos', 'tag untagged photos from this location on your hard-drive, \nThis might take a LONG TIME to load after you click this button.', '<input type="text" name="location">'))
     out=out.format("<p>example: /home/Mike/Pictures </p>{}")
@@ -71,11 +72,15 @@ empty_page='<html><body>{}</body></html>'
 initial_db={}#{photo_location.jpg:{'thumbnail':thumbnail_location.jpg, 'tag':'summer 2008'},...}
 database='tags.db'
 def fs_load():
-   try:
-      return pickle.load(open(database, 'rb'))
-   except:
-      fs_save(initial_db)
-      return pickle.load(open(database, 'rb'))      
+    try:
+        out=pickle.load(open(database, 'rb'))
+        if 'tag' not in out[out.keys()[0]]:
+            fs_save(initial_db)
+            return initial_db
+        return out
+    except:
+        fs_save(initial_db)
+        return pickle.load(open(database, 'rb'))      
 def fs_save(dic):
     pickle.dump(dic, open(database, 'wb'))
 def grab_photos(location):
@@ -87,6 +92,8 @@ def grab_photos(location):
     return photos
 def tagPhotos(dic_in):
     print('dic_in: ' +str(dic_in))
+    if dic_in['location'][-1:]=='/' and len(dic_in['location'])>1:
+        dic_in['location']=dic_in['location'][:-1]
     photos=grab_photos(dic_in['location'])
     fs=fs_load()
     untagged=[]
