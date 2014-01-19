@@ -3,7 +3,8 @@ import string,cgi,time, json, random, copy, pickle, image64, os
 import PIL
 from PIL import Image
 PORT=8090
-picture_height=300 #pixels
+picture_height4display=300 #counted in pixels. Change this to change the size of the displayed picture in your browser
+picture_height4thumbnail=300 #change this to make the picture in higher or lower detail. smaller numbers are less detailed and load quicker.
 output_file='save.txt'
 def fs2dic(fs):
     dic={}
@@ -16,16 +17,14 @@ def fs2dic(fs):
     return dic
 def to_thumbnail(img):
     location=img
-    basewidth = 300
+    baseheight = picture_height4thumbnail
     img = Image.open(img)
-    wpercent = (basewidth/float(img.size[0]))
-    hsize = int((float(img.size[1])*float(wpercent)))
-    img = img.resize((basewidth,hsize), PIL.Image.ANTIALIAS)
+    hpercent = (baseheight/float(img.size[1]))
+    wsize = int((float(img.size[0])*float(hpercent)))
+    img = img.resize((wsize,baseheight), PIL.Image.ANTIALIAS)
     string=location[-3:]+'_thumbnail.jpg'
     img.save(string)
     img=file2hexPicture(string)
-    print('img: ' +str(img))
-    
     return img
 
 form='''
@@ -60,7 +59,7 @@ def page1():
         out=out.format(easyForm('/renameGroup', 'retag every {} photo to: '.format(tag), '<input type="text" name="newName"><input type="hidden" name="oldName" value="{}">'.format(tag)))
     return out.format('')
 def hex2htmlPicture(string):
-    return '<img height="{}" src="data:image/png;base64,{}">{}'.format(str(picture_height), string, '{}')
+    return '<img height="{}" src="data:image/png;base64,{}">{}'.format(str(picture_height4display), string, '{}')
 def file2hexPicture(fil):
     return image64.convert(fil)
 def file2htmlPicture(fil):

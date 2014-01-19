@@ -7,3 +7,5 @@ run with:
 python gui.py
 
 then send your browser to URL: http://localhost:8090/
+
+donations: 1676NCiezxodBpM5j1Zafnuxuaeuz2vfPR
